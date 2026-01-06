@@ -5,9 +5,7 @@ Valheim Dedicated Server MCP Server
 Provides Claude with tools to manage a Valheim dedicated server.
 """
 
-import asyncio
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
+from mcp.server.fastmcp import FastMCP
 
 from tools.server import register_server_tools
 from tools.config import register_config_tools
@@ -26,23 +24,14 @@ CONFIG = {
     "SERVICE_NAME": "valheim",
 }
 
-server = Server("valheim-server")
+mcp = FastMCP("valheim-server")
 
-
-def register_all_tools():
-    """Register all tool modules with the MCP server."""
-    register_server_tools(server, CONFIG)
-    register_config_tools(server, CONFIG)
-    register_backup_tools(server, CONFIG)
-    register_update_tools(server, CONFIG)
-
-
-async def main():
-    """Run the MCP server."""
-    register_all_tools()
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+# Register all tools
+register_server_tools(mcp, CONFIG)
+register_config_tools(mcp, CONFIG)
+register_backup_tools(mcp, CONFIG)
+register_update_tools(mcp, CONFIG)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

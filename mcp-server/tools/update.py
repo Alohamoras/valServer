@@ -9,8 +9,7 @@ import json
 import os
 import tempfile
 import re
-from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.server.fastmcp import FastMCP
 
 
 VALHEIM_PLUS_RELEASES_URL = "https://api.github.com/repos/Grantapher/ValheimPlus/releases/latest"
@@ -53,7 +52,6 @@ def get_latest_valheimplus_version() -> str | None:
         result = run_command(["curl", "-s", VALHEIM_PLUS_RELEASES_URL], check=False)
         if result.returncode == 0:
             # Parse JSON response
-            import json
             data = json.loads(result.stdout)
             tag = data.get("tag_name", "")
             # Remove 'v' prefix if present
@@ -63,11 +61,11 @@ def get_latest_valheimplus_version() -> str | None:
     return None
 
 
-def register_update_tools(server: Server, config: dict):
+def register_update_tools(mcp: FastMCP, config: dict):
     """Register update management tools with the MCP server."""
 
-    @server.tool()
-    async def update_check() -> list[TextContent]:
+    @mcp.tool()
+    def update_check() -> str:
         """
         Check for available updates to Valheim and Valheim Plus.
 
@@ -96,10 +94,10 @@ def register_update_tools(server: Server, config: dict):
         else:
             result["valheim_plus"]["status"] = "unknown"
 
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        return json.dumps(result, indent=2)
 
-    @server.tool()
-    async def update_server() -> list[TextContent]:
+    @mcp.tool()
+    def update_server() -> str:
         """
         Update the Valheim Dedicated Server via SteamCMD.
 
@@ -113,10 +111,10 @@ def register_update_tools(server: Server, config: dict):
             try:
                 run_command(["sudo", "systemctl", "stop", service_name])
             except subprocess.CalledProcessError as e:
-                return [TextContent(type="text", text=json.dumps({
+                return json.dumps({
                     "success": False,
                     "message": f"Failed to stop server: {e.stderr}"
-                }))]
+                })
 
         # Run SteamCMD update
         try:
@@ -139,20 +137,20 @@ def register_update_tools(server: Server, config: dict):
                 run_command(["sudo", "systemctl", "start", service_name])
                 result["server_restarted"] = True
 
-            return [TextContent(type="text", text=json.dumps(result))]
+            return json.dumps(result)
         except subprocess.TimeoutExpired:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": "Update timed out after 10 minutes"
-            }))]
+            })
         except subprocess.CalledProcessError as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Update failed: {e.stderr}"
-            }))]
+            })
 
-    @server.tool()
-    async def update_valheimplus() -> list[TextContent]:
+    @mcp.tool()
+    def update_valheimplus() -> str:
         """
         Update Valheim Plus to the latest version.
 
@@ -166,10 +164,10 @@ def register_update_tools(server: Server, config: dict):
             try:
                 run_command(["sudo", "systemctl", "stop", service_name])
             except subprocess.CalledProcessError as e:
-                return [TextContent(type="text", text=json.dumps({
+                return json.dumps({
                     "success": False,
                     "message": f"Failed to stop server: {e.stderr}"
-                }))]
+                })
 
         try:
             # Download and extract Valheim Plus
@@ -209,20 +207,20 @@ def register_update_tools(server: Server, config: dict):
                 run_command(["sudo", "systemctl", "start", service_name])
                 result["server_restarted"] = True
 
-            return [TextContent(type="text", text=json.dumps(result))]
+            return json.dumps(result)
         except subprocess.TimeoutExpired:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": "Download timed out"
-            }))]
+            })
         except subprocess.CalledProcessError as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Update failed: {e.stderr}"
-            }))]
+            })
 
-    @server.tool()
-    async def update_all() -> list[TextContent]:
+    @mcp.tool()
+    def update_all() -> str:
         """
         Update both Valheim server and Valheim Plus.
 
@@ -237,10 +235,10 @@ def register_update_tools(server: Server, config: dict):
             try:
                 run_command(["sudo", "systemctl", "stop", service_name])
             except subprocess.CalledProcessError as e:
-                return [TextContent(type="text", text=json.dumps({
+                return json.dumps({
                     "success": False,
                     "message": f"Failed to stop server: {e.stderr}"
-                }))]
+                })
 
         # Update Valheim
         try:
@@ -299,4 +297,4 @@ def register_update_tools(server: Server, config: dict):
         overall_success = results["valheim"].get("success", False) and results["valheim_plus"].get("success", False)
         results["success"] = overall_success
 
-        return [TextContent(type="text", text=json.dumps(results, indent=2))]
+        return json.dumps(results, indent=2)

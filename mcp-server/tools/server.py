@@ -7,9 +7,7 @@ Provides tools for starting, stopping, restarting, and monitoring the Valheim se
 import subprocess
 import json
 import re
-from datetime import datetime
-from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.server.fastmcp import FastMCP
 
 
 def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -64,11 +62,11 @@ def get_player_count_from_logs(lines: int = 100) -> int | None:
         return None
 
 
-def register_server_tools(server: Server, config: dict):
+def register_server_tools(mcp: FastMCP, config: dict):
     """Register server management tools with the MCP server."""
 
-    @server.tool()
-    async def server_status() -> list[TextContent]:
+    @mcp.tool()
+    def server_status() -> str:
         """
         Get the current status of the Valheim server.
 
@@ -82,10 +80,10 @@ def register_server_tools(server: Server, config: dict):
             if player_count is not None:
                 status["estimated_players"] = player_count
 
-        return [TextContent(type="text", text=json.dumps(status, indent=2))]
+        return json.dumps(status, indent=2)
 
-    @server.tool()
-    async def server_start() -> list[TextContent]:
+    @mcp.tool()
+    def server_start() -> str:
         """
         Start the Valheim server.
 
@@ -94,25 +92,25 @@ def register_server_tools(server: Server, config: dict):
         # Check if already running
         status = get_service_status(config["SERVICE_NAME"])
         if status["running"]:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": "Server is already running"
-            }))]
+            })
 
         try:
             run_command(["sudo", "systemctl", "start", config["SERVICE_NAME"]])
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "message": "Server started successfully"
-            }))]
+            })
         except subprocess.CalledProcessError as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Failed to start server: {e.stderr}"
-            }))]
+            })
 
-    @server.tool()
-    async def server_stop(graceful: bool = True) -> list[TextContent]:
+    @mcp.tool()
+    def server_stop(graceful: bool = True) -> str:
         """
         Stop the Valheim server.
 
@@ -122,25 +120,25 @@ def register_server_tools(server: Server, config: dict):
         """
         status = get_service_status(config["SERVICE_NAME"])
         if not status["running"]:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": "Server is not running"
-            }))]
+            })
 
         try:
             run_command(["sudo", "systemctl", "stop", config["SERVICE_NAME"]])
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "message": "Server stopped successfully"
-            }))]
+            })
         except subprocess.CalledProcessError as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Failed to stop server: {e.stderr}"
-            }))]
+            })
 
-    @server.tool()
-    async def server_restart() -> list[TextContent]:
+    @mcp.tool()
+    def server_restart() -> str:
         """
         Restart the Valheim server.
 
@@ -148,24 +146,24 @@ def register_server_tools(server: Server, config: dict):
         """
         try:
             run_command(["sudo", "systemctl", "restart", config["SERVICE_NAME"]])
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "message": "Server restarted successfully"
-            }))]
+            })
         except subprocess.CalledProcessError as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Failed to restart server: {e.stderr}"
-            }))]
+            })
 
-    @server.tool()
-    async def server_logs(lines: int = 50, filter: str = "") -> list[TextContent]:
+    @mcp.tool()
+    def server_logs(lines: int = 50, filter_text: str = "") -> str:
         """
         Get recent server logs.
 
         Args:
             lines: Number of log lines to retrieve (default 50, max 500)
-            filter: Optional string to filter logs (grep pattern)
+            filter_text: Optional string to filter logs (grep pattern)
         """
         lines = min(max(1, lines), 500)  # Clamp between 1 and 500
 
@@ -176,16 +174,16 @@ def register_server_tools(server: Server, config: dict):
             output = result.stdout
 
             # Apply filter if provided
-            if filter:
-                filtered_lines = [line for line in output.split("\n") if filter.lower() in line.lower()]
+            if filter_text:
+                filtered_lines = [line for line in output.split("\n") if filter_text.lower() in line.lower()]
                 output = "\n".join(filtered_lines)
 
-            return [TextContent(type="text", text=output if output else "No logs found")]
+            return output if output else "No logs found"
         except Exception as e:
-            return [TextContent(type="text", text=f"Error retrieving logs: {str(e)}")]
+            return f"Error retrieving logs: {str(e)}"
 
-    @server.tool()
-    async def server_info() -> list[TextContent]:
+    @mcp.tool()
+    def server_info() -> str:
         """
         Get server configuration information.
 
@@ -223,4 +221,4 @@ def register_server_tools(server: Server, config: dict):
         except Exception as e:
             info["warning"] = f"Could not read server config: {str(e)}"
 
-        return [TextContent(type="text", text=json.dumps(info, indent=2))]
+        return json.dumps(info, indent=2)

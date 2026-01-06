@@ -8,8 +8,7 @@ import subprocess
 import json
 import os
 from datetime import datetime
-from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.server.fastmcp import FastMCP
 
 
 def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -47,11 +46,11 @@ def get_backup_files(backup_dir: str) -> list[dict]:
     return backups
 
 
-def register_backup_tools(server: Server, config: dict):
+def register_backup_tools(mcp: FastMCP, config: dict):
     """Register backup management tools with the MCP server."""
 
-    @server.tool()
-    async def backup_create(name: str = "") -> list[TextContent]:
+    @mcp.tool()
+    def backup_create(name: str = "") -> str:
         """
         Create a backup of the Valheim world saves.
 
@@ -66,17 +65,17 @@ def register_backup_tools(server: Server, config: dict):
 
         # Check if worlds directory exists
         if not os.path.exists(worlds_dir):
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Worlds directory not found: {worlds_dir}"
-            }))]
+            })
 
         # Ensure backup directory exists
         if not ensure_backup_dir(backup_dir):
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Could not create backup directory: {backup_dir}"
-            }))]
+            })
 
         # Generate backup filename
         if name:
@@ -91,10 +90,10 @@ def register_backup_tools(server: Server, config: dict):
 
         # Check if backup already exists
         if os.path.exists(backup_path):
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Backup already exists: {backup_name}"
-            }))]
+            })
 
         try:
             # Create tarball of worlds directory
@@ -107,21 +106,21 @@ def register_backup_tools(server: Server, config: dict):
             # Get size of created backup
             size_mb = round(os.path.getsize(backup_path) / (1024 * 1024), 2)
 
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "message": "Backup created successfully",
                 "backup_name": backup_name,
                 "size_mb": size_mb,
                 "path": backup_path
-            }))]
+            })
         except subprocess.CalledProcessError as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Failed to create backup: {e.stderr}"
-            }))]
+            })
 
-    @server.tool()
-    async def backup_list() -> list[TextContent]:
+    @mcp.tool()
+    def backup_list() -> str:
         """
         List all available world backups.
 
@@ -130,15 +129,15 @@ def register_backup_tools(server: Server, config: dict):
         backup_dir = config["BACKUP_DIR"]
         backups = get_backup_files(backup_dir)
 
-        return [TextContent(type="text", text=json.dumps({
+        return json.dumps({
             "success": True,
             "backup_dir": backup_dir,
             "backups": backups,
             "count": len(backups)
-        }, indent=2))]
+        }, indent=2)
 
-    @server.tool()
-    async def backup_restore(name: str) -> list[TextContent]:
+    @mcp.tool()
+    def backup_restore(name: str) -> str:
         """
         Restore a world backup.
 
@@ -154,20 +153,20 @@ def register_backup_tools(server: Server, config: dict):
         # Verify backup exists
         if not os.path.exists(backup_path):
             backups = get_backup_files(backup_dir)
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Backup not found: {name}",
                 "available_backups": [b["name"] for b in backups]
-            }))]
+            })
 
         # Check if server is running
         result = run_command(["systemctl", "is-active", config["SERVICE_NAME"]], check=False)
         if result.stdout.strip() == "active":
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": "Server is running. Please stop the server before restoring a backup.",
                 "hint": "Use server_stop first"
-            }))]
+            })
 
         try:
             # Create a backup of current state before restoring
@@ -188,20 +187,20 @@ def register_backup_tools(server: Server, config: dict):
                 "-C", data_dir
             ])
 
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "message": f"Backup restored successfully: {name}",
                 "pre_restore_backup": os.path.basename(pre_restore_backup),
                 "note": "You can now start the server"
-            }))]
+            })
         except subprocess.CalledProcessError as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Failed to restore backup: {e.stderr}"
-            }))]
+            })
 
-    @server.tool()
-    async def backup_delete(name: str) -> list[TextContent]:
+    @mcp.tool()
+    def backup_delete(name: str) -> str:
         """
         Delete a world backup.
 
@@ -214,20 +213,20 @@ def register_backup_tools(server: Server, config: dict):
         # Verify backup exists
         if not os.path.exists(backup_path):
             backups = get_backup_files(backup_dir)
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Backup not found: {name}",
                 "available_backups": [b["name"] for b in backups]
-            }))]
+            })
 
         try:
             os.remove(backup_path)
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "message": f"Backup deleted: {name}"
-            }))]
+            })
         except Exception as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Failed to delete backup: {str(e)}"
-            }))]
+            })

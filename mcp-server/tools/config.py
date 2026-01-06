@@ -7,8 +7,7 @@ Provides tools for reading and modifying Valheim Plus configuration.
 import json
 import configparser
 import os
-from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.server.fastmcp import FastMCP
 
 
 class ValheimPlusConfig:
@@ -63,11 +62,11 @@ class ValheimPlusConfig:
         return self.parser[section].get(key)
 
 
-def register_config_tools(server: Server, config: dict):
+def register_config_tools(mcp: FastMCP, config: dict):
     """Register configuration management tools with the MCP server."""
 
-    @server.tool()
-    async def config_get(section: str = "") -> list[TextContent]:
+    @mcp.tool()
+    def config_get(section: str = "") -> str:
         """
         Get Valheim Plus configuration values.
 
@@ -78,32 +77,32 @@ def register_config_tools(server: Server, config: dict):
         vp_config = ValheimPlusConfig(config["VALHEIM_PLUS_CONFIG"])
 
         if not vp_config.load():
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Config file not found: {config['VALHEIM_PLUS_CONFIG']}"
-            }))]
+            })
 
         if section:
             section_data = vp_config.get_section(section)
             if section_data is None:
-                return [TextContent(type="text", text=json.dumps({
+                return json.dumps({
                     "success": False,
                     "message": f"Section '{section}' not found",
                     "available_sections": vp_config.get_sections()
-                }))]
-            return [TextContent(type="text", text=json.dumps({
+                })
+            return json.dumps({
                 "success": True,
                 "section": section,
                 "values": section_data
-            }, indent=2))]
+            }, indent=2)
         else:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "config": vp_config.get_all()
-            }, indent=2))]
+            }, indent=2)
 
-    @server.tool()
-    async def config_set(section: str, key: str, value: str) -> list[TextContent]:
+    @mcp.tool()
+    def config_set(section: str, key: str, value: str) -> str:
         """
         Set a Valheim Plus configuration value.
 
@@ -117,38 +116,38 @@ def register_config_tools(server: Server, config: dict):
         vp_config = ValheimPlusConfig(config["VALHEIM_PLUS_CONFIG"])
 
         if not vp_config.load():
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Config file not found: {config['VALHEIM_PLUS_CONFIG']}"
-            }))]
+            })
 
         # Get old value for confirmation
         old_value = vp_config.get_value(section, key)
 
         if not vp_config.set_value(section, key, value):
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Section '{section}' not found",
                 "available_sections": vp_config.get_sections()
-            }))]
+            })
 
         try:
             vp_config.save()
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": True,
                 "message": f"Updated [{section}] {key}",
                 "old_value": old_value,
                 "new_value": value,
                 "note": "Restart the server for changes to take effect"
-            }))]
+            })
         except Exception as e:
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Failed to save config: {str(e)}"
-            }))]
+            })
 
-    @server.tool()
-    async def config_sections() -> list[TextContent]:
+    @mcp.tool()
+    def config_sections() -> str:
         """
         List all available configuration sections in Valheim Plus.
 
@@ -157,14 +156,14 @@ def register_config_tools(server: Server, config: dict):
         vp_config = ValheimPlusConfig(config["VALHEIM_PLUS_CONFIG"])
 
         if not vp_config.load():
-            return [TextContent(type="text", text=json.dumps({
+            return json.dumps({
                 "success": False,
                 "message": f"Config file not found: {config['VALHEIM_PLUS_CONFIG']}"
-            }))]
+            })
 
         sections = vp_config.get_sections()
-        return [TextContent(type="text", text=json.dumps({
+        return json.dumps({
             "success": True,
             "sections": sections,
             "count": len(sections)
-        }, indent=2))]
+        }, indent=2)
