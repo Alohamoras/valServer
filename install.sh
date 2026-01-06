@@ -181,18 +181,25 @@ done
 TEMP_DIR=$(mktemp -d)
 wget -q -O "${TEMP_DIR}/valheimplus.tar.gz" "$VALHEIM_PLUS_URL"
 tar -xzf "${TEMP_DIR}/valheimplus.tar.gz" -C "$VALHEIM_DIR"
-chown -R "${STEAM_USER}:${STEAM_USER}" "$VALHEIM_DIR"
 rm -rf "$TEMP_DIR"
+
+# Download Valheim Plus config file (not included in tarball, and in-game download fails)
+VALHEIM_PLUS_VERSION=$(basename "$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/Grantapher/ValheimPlus/releases/latest)")
+VALHEIM_PLUS_CONFIG_URL="https://github.com/Grantapher/ValheimPlus/releases/download/${VALHEIM_PLUS_VERSION}/valheim_plus.cfg"
+wget -q -O "${VALHEIM_DIR}/BepInEx/config/valheim_plus.cfg" "$VALHEIM_PLUS_CONFIG_URL"
+
+chown -R "${STEAM_USER}:${STEAM_USER}" "$VALHEIM_DIR"
 
 # --- Create server start script ---
 log_info "Creating server start script..."
 cat > "${VALHEIM_DIR}/start_server.sh" << 'STARTSCRIPT'
 #!/bin/bash
 export templdpath=$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=./linux64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=./doorstop_libs:./linux64:$LD_LIBRARY_PATH
+export LD_PRELOAD="libdoorstop_x64.so:$LD_PRELOAD"
 export SteamAppId=892970
 
-# Enable Valheim Plus
+# Enable Valheim Plus (BepInEx/Doorstop)
 export DOORSTOP_ENABLE=TRUE
 export DOORSTOP_INVOKE_DLL_PATH=./BepInEx/core/BepInEx.Preloader.dll
 export DOORSTOP_CORLIB_OVERRIDE_PATH=./unstripped_corlib
