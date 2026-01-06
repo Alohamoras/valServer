@@ -18,16 +18,30 @@ Automated installer for a Valheim dedicated server with Valheim Plus mod on Ubun
 
 ## Installation
 
+### Interactive
+
 ```bash
 git clone https://github.com/Alohamoras/valServer.git
 cd valServer
 sudo ./install.sh
 ```
 
-The installer will prompt for:
-- **Server Name** - Displayed in the server browser
-- **World Name** - Name of your world save
-- **Password** - Server password (minimum 5 characters)
+### One-Liner (Non-Interactive)
+
+```bash
+sudo ./install.sh -n "My Server" -w "MyWorld" -p "secret123" -y -s
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `-n` | Server name (displayed in server list) |
+| `-w` | World name (name of the world save) |
+| `-p` | Server password (minimum 5 characters) |
+| `-y` | Skip confirmation prompt |
+| `-s` | Start server after installation |
+| `-h` | Show help message |
 
 ## Server Management
 

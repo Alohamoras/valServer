@@ -6,6 +6,43 @@
 
 set -e
 
+# --- Usage ---
+usage() {
+    echo "Usage: $0 [-n server_name] [-w world_name] [-p password] [-y]"
+    echo ""
+    echo "Options:"
+    echo "  -n    Server name (displayed in server list)"
+    echo "  -w    World name (name of the world save)"
+    echo "  -p    Server password (minimum 5 characters)"
+    echo "  -y    Skip confirmation prompt"
+    echo "  -s    Start server after installation"
+    echo "  -h    Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  Interactive:  sudo $0"
+    echo "  One-liner:    sudo $0 -n \"My Server\" -w \"MyWorld\" -p \"secret123\" -y -s"
+    exit 0
+}
+
+# --- Parse command line arguments ---
+SERVER_NAME=""
+WORLD_NAME=""
+SERVER_PASSWORD=""
+AUTO_CONFIRM=false
+AUTO_START=false
+
+while getopts "n:w:p:ysh" opt; do
+    case $opt in
+        n) SERVER_NAME="$OPTARG" ;;
+        w) WORLD_NAME="$OPTARG" ;;
+        p) SERVER_PASSWORD="$OPTARG" ;;
+        y) AUTO_CONFIRM=true ;;
+        s) AUTO_START=true ;;
+        h) usage ;;
+        *) usage ;;
+    esac
+done
+
 # --- Configuration ---
 STEAM_USER="steam"
 STEAM_HOME="/home/${STEAM_USER}"
@@ -34,38 +71,49 @@ if ! grep -q "Ubuntu 24" /etc/os-release 2>/dev/null; then
     log_warn "This script is designed for Ubuntu 24.04. Proceeding anyway..."
 fi
 
-# --- Prompt for server configuration ---
+# --- Prompt for server configuration (if not provided via flags) ---
 echo ""
 echo "=== Valheim Server Configuration ==="
 echo ""
 
-read -p "Server Name (displayed in server list): " SERVER_NAME
-while [[ -z "$SERVER_NAME" ]]; do
-    log_error "Server name cannot be empty"
-    read -p "Server Name: " SERVER_NAME
-done
+if [[ -z "$SERVER_NAME" ]]; then
+    read -p "Server Name (displayed in server list): " SERVER_NAME
+    while [[ -z "$SERVER_NAME" ]]; do
+        log_error "Server name cannot be empty"
+        read -p "Server Name: " SERVER_NAME
+    done
+fi
 
-read -p "World Name (name of the world save): " WORLD_NAME
-while [[ -z "$WORLD_NAME" ]]; do
-    log_error "World name cannot be empty"
-    read -p "World Name: " WORLD_NAME
-done
+if [[ -z "$WORLD_NAME" ]]; then
+    read -p "World Name (name of the world save): " WORLD_NAME
+    while [[ -z "$WORLD_NAME" ]]; do
+        log_error "World name cannot be empty"
+        read -p "World Name: " WORLD_NAME
+    done
+fi
 
-while true; do
-    read -s -p "Server Password (min 5 characters, won't be displayed): " SERVER_PASSWORD
-    echo ""
+if [[ -z "$SERVER_PASSWORD" ]]; then
+    while true; do
+        read -s -p "Server Password (min 5 characters, won't be displayed): " SERVER_PASSWORD
+        echo ""
+        if [[ ${#SERVER_PASSWORD} -lt 5 ]]; then
+            log_error "Password must be at least 5 characters"
+        else
+            read -s -p "Confirm Password: " SERVER_PASSWORD_CONFIRM
+            echo ""
+            if [[ "$SERVER_PASSWORD" != "$SERVER_PASSWORD_CONFIRM" ]]; then
+                log_error "Passwords do not match"
+            else
+                break
+            fi
+        fi
+    done
+else
     if [[ ${#SERVER_PASSWORD} -lt 5 ]]; then
         log_error "Password must be at least 5 characters"
-    else
-        read -s -p "Confirm Password: " SERVER_PASSWORD_CONFIRM
-        echo ""
-        if [[ "$SERVER_PASSWORD" != "$SERVER_PASSWORD_CONFIRM" ]]; then
-            log_error "Passwords do not match"
-        else
-            break
-        fi
+        exit 1
     fi
-done
+fi
 
 echo ""
 log_info "Configuration:"
@@ -73,10 +121,13 @@ log_info "  Server Name: ${SERVER_NAME}"
 log_info "  World Name:  ${WORLD_NAME}"
 log_info "  Password:    ********"
 echo ""
-read -p "Proceed with installation? (y/n): " CONFIRM
-if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-    log_info "Installation cancelled"
-    exit 0
+
+if [[ "$AUTO_CONFIRM" != true ]]; then
+    read -p "Proceed with installation? (y/n): " CONFIRM
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+        log_info "Installation cancelled"
+        exit 0
+    fi
 fi
 
 # --- Install dependencies ---
@@ -327,7 +378,14 @@ echo "  Manual Update:   sudo ${STEAM_HOME}/update-valheim.sh"
 echo ""
 echo "=============================================="
 echo ""
-read -p "Start the server now? (y/n): " START_NOW
+if [[ "$AUTO_START" == true ]]; then
+    START_NOW="y"
+elif [[ "$AUTO_CONFIRM" == true ]]; then
+    START_NOW="n"
+else
+    read -p "Start the server now? (y/n): " START_NOW
+fi
+
 if [[ "$START_NOW" =~ ^[Yy]$ ]]; then
     log_info "Starting Valheim server..."
     systemctl start valheim.service
