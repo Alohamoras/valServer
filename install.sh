@@ -134,7 +134,7 @@ fi
 log_info "Installing dependencies..."
 dpkg --add-architecture i386
 apt-get update
-apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq
+apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq python3.12-venv
 
 # --- Create steam user ---
 if ! id "$STEAM_USER" &>/dev/null; then
@@ -350,6 +350,52 @@ if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
     ufw allow 2456:2458/udp comment "Valheim Server"
 fi
 
+# --- Setup MCP Server for Claude Code ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MCP_DIR="${SCRIPT_DIR}/mcp-server"
+
+if [[ -d "$MCP_DIR" ]]; then
+    log_info "Setting up MCP server for Claude Code..."
+
+    # Create venv and install dependencies
+    cd "$MCP_DIR"
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -q -r requirements.txt
+    deactivate
+
+    # Configure Claude Code settings for the user who ran sudo
+    if [[ -n "$SUDO_USER" ]]; then
+        CLAUDE_USER="$SUDO_USER"
+        CLAUDE_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    else
+        CLAUDE_USER="$USER"
+        CLAUDE_HOME="$HOME"
+    fi
+
+    CLAUDE_SETTINGS_DIR="${CLAUDE_HOME}/.claude"
+    CLAUDE_SETTINGS="${CLAUDE_SETTINGS_DIR}/settings.json"
+
+    mkdir -p "$CLAUDE_SETTINGS_DIR"
+
+    # Create or update Claude settings
+    cat > "$CLAUDE_SETTINGS" << EOF
+{
+  "mcpServers": {
+    "valheim": {
+      "command": "${MCP_DIR}/venv/bin/python",
+      "args": ["${MCP_DIR}/valheim_server.py"]
+    }
+  }
+}
+EOF
+
+    chown -R "${CLAUDE_USER}:${CLAUDE_USER}" "$CLAUDE_SETTINGS_DIR"
+    log_info "Claude Code MCP server configured for user ${CLAUDE_USER}"
+else
+    log_warn "MCP server directory not found at ${MCP_DIR}, skipping Claude Code setup"
+fi
+
 # --- Print summary ---
 echo ""
 echo "=============================================="
@@ -383,6 +429,13 @@ echo "  Schedule:        Daily at 5:00 AM Eastern Time"
 echo "  Update Log:      /var/log/valheim-update.log"
 echo "  Manual Update:   sudo ${STEAM_HOME}/update-valheim.sh"
 echo ""
+if [[ -d "$MCP_DIR" ]]; then
+echo "Claude Code MCP Server:"
+echo "  Status:          Configured for user ${CLAUDE_USER}"
+echo "  Settings:        ${CLAUDE_SETTINGS}"
+echo "  Note:            Restart Claude Code to enable MCP tools"
+echo ""
+fi
 echo "=============================================="
 echo ""
 if [[ "$AUTO_START" == true ]]; then
