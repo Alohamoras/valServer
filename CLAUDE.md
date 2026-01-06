@@ -17,7 +17,7 @@ The MCP server gives Claude direct tools to manage the Valheim server. Setup is 
 The installer automatically:
 - Creates a Python venv in `mcp-server/`
 - Installs dependencies
-- Configures `~/.claude/settings.json` for the user running the installer
+- Registers the MCP server with Claude Code using `claude mcp add`
 
 Just restart Claude Code after installation to enable the tools.
 
@@ -35,16 +35,9 @@ If you need to set up manually:
    deactivate
    ```
 
-2. Add to Claude Code settings (`~/.claude/settings.json`):
-   ```json
-   {
-     "mcpServers": {
-       "valheim": {
-         "command": "/path/to/valServer/mcp-server/venv/bin/python",
-         "args": ["/path/to/valServer/mcp-server/valheim_server.py"]
-       }
-     }
-   }
+2. Register the MCP server with Claude Code:
+   ```bash
+   claude mcp add --transport stdio valheim -- /path/to/valServer/mcp-server/venv/bin/python /path/to/valServer/mcp-server/valheim_server.py
    ```
 
 3. Restart Claude Code

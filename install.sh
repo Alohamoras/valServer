@@ -364,34 +364,22 @@ if [[ -d "$MCP_DIR" ]]; then
     pip install -q -r requirements.txt
     deactivate
 
-    # Configure Claude Code settings for the user who ran sudo
+    # Configure Claude Code MCP server for the user who ran sudo
     if [[ -n "$SUDO_USER" ]]; then
         CLAUDE_USER="$SUDO_USER"
-        CLAUDE_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     else
         CLAUDE_USER="$USER"
-        CLAUDE_HOME="$HOME"
     fi
 
-    CLAUDE_SETTINGS_DIR="${CLAUDE_HOME}/.claude"
-    CLAUDE_SETTINGS="${CLAUDE_SETTINGS_DIR}/settings.json"
-
-    mkdir -p "$CLAUDE_SETTINGS_DIR"
-
-    # Create or update Claude settings
-    cat > "$CLAUDE_SETTINGS" << EOF
-{
-  "mcpServers": {
-    "valheim": {
-      "command": "${MCP_DIR}/venv/bin/python",
-      "args": ["${MCP_DIR}/valheim_server.py"]
-    }
-  }
-}
-EOF
-
-    chown -R "${CLAUDE_USER}:${CLAUDE_USER}" "$CLAUDE_SETTINGS_DIR"
-    log_info "Claude Code MCP server configured for user ${CLAUDE_USER}"
+    # Check if claude CLI is available and register MCP server
+    if command -v claude &>/dev/null; then
+        log_info "Registering MCP server with Claude Code..."
+        sudo -u "$CLAUDE_USER" claude mcp add --transport stdio valheim -- "${MCP_DIR}/venv/bin/python" "${MCP_DIR}/valheim_server.py" 2>/dev/null || true
+        log_info "Claude Code MCP server registered for user ${CLAUDE_USER}"
+    else
+        log_warn "Claude Code CLI not found. To manually register the MCP server, run:"
+        log_warn "  claude mcp add --transport stdio valheim -- ${MCP_DIR}/venv/bin/python ${MCP_DIR}/valheim_server.py"
+    fi
 else
     log_warn "MCP server directory not found at ${MCP_DIR}, skipping Claude Code setup"
 fi
@@ -432,7 +420,6 @@ echo ""
 if [[ -d "$MCP_DIR" ]]; then
 echo "Claude Code MCP Server:"
 echo "  Status:          Configured for user ${CLAUDE_USER}"
-echo "  Settings:        ${CLAUDE_SETTINGS}"
 echo "  Note:            Restart Claude Code to enable MCP tools"
 echo ""
 fi
