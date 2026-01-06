@@ -4,40 +4,85 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This repository contains a single bash installer script (`install.sh`) for deploying a Valheim dedicated game server with Valheim Plus mod on Ubuntu 24.04.
+This repository contains:
+- `install.sh` - Bash installer for deploying a Valheim dedicated server with Valheim Plus on Ubuntu 24.04
+- `mcp-server/` - MCP server providing Claude with native tools to manage the Valheim server
 
-## What the Installer Does
+## MCP Server Setup
 
-The script performs a complete server setup:
-1. Installs SteamCMD and Valheim Dedicated Server (Steam App ID 896660)
-2. Installs Valheim Plus mod from the Grantapher fork
-3. Creates a `steam` system user for running the server
-4. Sets up a systemd service (`valheim.service`) for server management
-5. Configures a daily auto-update cron job (5 AM Eastern Time)
-6. Opens firewall ports 2456-2458/UDP if UFW is active
+The MCP server gives Claude direct tools to manage the Valheim server. To enable:
 
-## Key File Locations (on target system after install)
+1. Install dependencies:
+   ```bash
+   cd mcp-server
+   pip install -r requirements.txt
+   ```
+
+2. Add to Claude Code settings (`~/.claude/settings.json`):
+   ```json
+   {
+     "mcpServers": {
+       "valheim": {
+         "command": "python",
+         "args": ["/path/to/valServer/mcp-server/valheim_server.py"]
+       }
+     }
+   }
+   ```
+
+3. Restart Claude Code
+
+## Available MCP Tools
+
+### Server Management
+- `server_status` - Get running state, uptime, memory usage
+- `server_start` - Start the server
+- `server_stop` - Stop the server (graceful shutdown)
+- `server_restart` - Restart the server
+- `server_logs` - Get recent logs (with optional filter)
+- `server_info` - Get server name, world, paths
+
+### Configuration (Valheim Plus)
+- `config_get` - Read config values (all or by section)
+- `config_set` - Set a config value
+- `config_sections` - List available config sections
+
+### Backups
+- `backup_create` - Create world backup
+- `backup_list` - List available backups
+- `backup_restore` - Restore a backup
+- `backup_delete` - Delete a backup
+
+### Updates
+- `update_check` - Check for available updates
+- `update_server` - Update Valheim via SteamCMD
+- `update_valheimplus` - Update Valheim Plus
+- `update_all` - Update everything
+
+## Key File Locations (on target system)
 
 - Server files: `/home/steam/valheim-server/`
 - World saves: `/home/steam/.config/unity3d/IronGate/Valheim/`
 - Valheim Plus config: `/home/steam/valheim-server/BepInEx/config/valheim_plus.cfg`
-- Update script: `/home/steam/update-valheim.sh`
-- Update log: `/var/log/valheim-update.log`
+- Backups: `/home/steam/valheim-backups/`
 
-## Server Management (post-install)
+## What the Installer Does
 
-```bash
-sudo systemctl start valheim      # Start server
-sudo systemctl stop valheim       # Stop server
-sudo systemctl status valheim     # Check status
-sudo journalctl -u valheim -f     # View logs
-sudo /home/steam/update-valheim.sh  # Manual update
-```
+1. Installs SteamCMD and Valheim Dedicated Server (Steam App ID 896660)
+2. Installs Valheim Plus mod from the Grantapher fork
+3. Creates `steam` system user for running the server
+4. Sets up systemd service (`valheim.service`)
+5. Configures daily auto-update cron job (5 AM Eastern)
+6. Opens firewall ports 2456-2458/UDP if UFW is active
 
 ## Running the Installer
 
 ```bash
+# Interactive
 sudo ./install.sh
+
+# Non-interactive
+sudo ./install.sh -n "Server Name" -w "WorldName" -p "password" -y -s
 ```
 
-The script prompts interactively for server name, world name, and password (minimum 5 characters).
+Flags: `-n` name, `-w` world, `-p` password, `-y` skip confirm, `-s` auto-start, `-h` help

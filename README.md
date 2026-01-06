@@ -1,6 +1,6 @@
 # Valheim Dedicated Server Installer
 
-Automated installer for a Valheim dedicated server with Valheim Plus mod on Ubuntu 24.04.
+Automated installer for a Valheim dedicated server with Valheim Plus mod on Ubuntu 24.04. Includes an MCP server for Claude integration.
 
 ## Features
 
@@ -9,6 +9,7 @@ Automated installer for a Valheim dedicated server with Valheim Plus mod on Ubun
 - Creates systemd service for easy server management
 - Configures daily auto-updates (5 AM Eastern Time)
 - Automatically configures UFW firewall rules if active
+- **MCP server for Claude AI integration** (manage server via natural language)
 
 ## Requirements
 
@@ -68,6 +69,7 @@ sudo /home/steam/update-valheim.sh
 | Server files | `/home/steam/valheim-server/` |
 | World saves | `/home/steam/.config/unity3d/IronGate/Valheim/` |
 | Valheim Plus config | `/home/steam/valheim-server/BepInEx/config/valheim_plus.cfg` |
+| Backups | `/home/steam/valheim-backups/` |
 | Update log | `/var/log/valheim-update.log` |
 
 ## Valheim Plus Configuration
@@ -83,3 +85,48 @@ Restart the server after making changes:
 ```bash
 sudo systemctl restart valheim
 ```
+
+## Claude AI Integration (MCP Server)
+
+This project includes an MCP server that allows Claude to manage your Valheim server directly.
+
+### Setup
+
+1. Install Python dependencies:
+   ```bash
+   cd mcp-server
+   pip install -r requirements.txt
+   ```
+
+2. Add to your Claude Code settings (`~/.claude/settings.json`):
+   ```json
+   {
+     "mcpServers": {
+       "valheim": {
+         "command": "python",
+         "args": ["/path/to/valServer/mcp-server/valheim_server.py"]
+       }
+     }
+   }
+   ```
+
+3. Restart Claude Code
+
+### Available Tools
+
+| Category | Tools |
+|----------|-------|
+| Server | `server_status`, `server_start`, `server_stop`, `server_restart`, `server_logs`, `server_info` |
+| Config | `config_get`, `config_set`, `config_sections` |
+| Backup | `backup_create`, `backup_list`, `backup_restore`, `backup_delete` |
+| Update | `update_check`, `update_server`, `update_valheimplus`, `update_all` |
+
+### Example Usage
+
+Just ask Claude:
+- "What's the server status?"
+- "Restart the Valheim server"
+- "Create a backup before we make changes"
+- "Update Valheim Plus to the latest version"
+- "Show me the last 100 lines of server logs"
+- "Enable the Map section in Valheim Plus config"
