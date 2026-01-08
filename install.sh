@@ -199,7 +199,7 @@ done
 # Create vmm configuration
 log_info "Creating vmm_config.toml..."
 cat > "$VMM_CONFIG" << EOF
-mod_list = ["denikson-BepInExPack_Valheim", "Grantapher-ValheimPlus"]
+mod_list = ["denikson-BepInExPack_Valheim", "Grantapher-ValheimPlus_Grantapher_Temporary"]
 log_level = "info"
 cache_dir = "${STEAM_HOME}/.config/vmm"
 install_dir = "${VALHEIM_DIR}"
@@ -217,21 +217,31 @@ sudo -u "$STEAM_USER" bash -c "source ${STEAM_HOME}/.cargo/env && vmm update man
 log_info "Installing mods (BepInEx + Valheim Plus)..."
 sudo -u "$STEAM_USER" bash -c "source ${STEAM_HOME}/.cargo/env && vmm update mods"
 
+# vmm places mods in subfolders - copy contents to correct locations
+log_info "Copying mod files to correct locations..."
+BEPINEX_PACK_DIR="${VALHEIM_DIR}/denikson-BepInExPack_Valheim/BepInExPack_Valheim"
+if [[ -d "$BEPINEX_PACK_DIR" ]]; then
+    cp -r "${BEPINEX_PACK_DIR}"/* "${VALHEIM_DIR}/"
+fi
+
+VPLUS_DIR="${VALHEIM_DIR}/Grantapher-ValheimPlus_Grantapher_Temporary"
+if [[ -d "$VPLUS_DIR/BepInEx" ]]; then
+    cp -r "${VPLUS_DIR}/BepInEx"/* "${VALHEIM_DIR}/BepInEx/"
+fi
+
 chown -R "${STEAM_USER}:${STEAM_USER}" "$VALHEIM_DIR"
 
 # --- Create server start script ---
 log_info "Creating server start script..."
 cat > "${VALHEIM_DIR}/start_server.sh" << 'STARTSCRIPT'
 #!/bin/bash
-export templdpath=$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=./doorstop_libs:./linux64:$LD_LIBRARY_PATH
+# BepInEx/Doorstop settings
+export DOORSTOP_ENABLED=1
+export DOORSTOP_TARGET_ASSEMBLY=./BepInEx/core/BepInEx.Preloader.dll
+
+export LD_LIBRARY_PATH="./doorstop_libs:./linux64:$LD_LIBRARY_PATH"
 export LD_PRELOAD="libdoorstop_x64.so:$LD_PRELOAD"
 export SteamAppId=892970
-
-# Enable Valheim Plus (BepInEx/Doorstop)
-export DOORSTOP_ENABLE=TRUE
-export DOORSTOP_INVOKE_DLL_PATH=./BepInEx/core/BepInEx.Preloader.dll
-export DOORSTOP_CORLIB_OVERRIDE_PATH=./unstripped_corlib
 
 cd "VALHEIM_DIR_PLACEHOLDER"
 
