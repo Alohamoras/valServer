@@ -44,6 +44,7 @@ while getopts "n:w:p:ysh" opt; do
 done
 
 # --- Configuration ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STEAM_USER="steam"
 STEAM_HOME="/home/${STEAM_USER}"
 STEAMCMD_DIR="${STEAM_HOME}/steamcmd"
@@ -385,7 +386,6 @@ if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
 fi
 
 # --- Setup MCP Server for Claude Code ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MCP_DIR="${SCRIPT_DIR}/mcp-server"
 
 if [[ -d "$MCP_DIR" ]]; then
