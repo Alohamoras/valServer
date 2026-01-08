@@ -5,8 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 
 This repository contains:
-- `install.sh` - Bash installer for deploying a Valheim dedicated server with Valheim Plus on Ubuntu 24.04
+- `install.sh` - Bash installer for deploying a Valheim dedicated server with mods on Ubuntu 24.04
 - `mcp-server/` - MCP server providing Claude with native tools to manage the Valheim server
+
+Mods are managed via [Valheim Mod Manager (vmm)](https://github.com/endoze/valheim-mod-manager), which downloads mods from Thunderstore and handles dependencies automatically.
 
 ## MCP Server Setup
 
@@ -69,21 +71,30 @@ If you need to set up manually:
 - `update_valheimplus` - Update Valheim Plus
 - `update_all` - Update everything
 
+### Mod Management (vmm)
+- `mods_list` - List configured mods from vmm_config.toml
+- `mods_add` - Add a mod to config and optionally install it
+- `mods_remove` - Remove a mod from config
+- `mods_search` - Search for mods on Thunderstore
+- `mods_update` - Update all mods to latest versions
+
 ## Key File Locations (on target system)
 
 - Server files: `/home/steam/valheim-server/`
 - World saves: `/home/steam/.config/unity3d/IronGate/Valheim/`
 - Valheim Plus config: `/home/steam/valheim-server/BepInEx/config/valheim_plus.cfg`
+- Mod config (vmm): `/home/steam/vmm_config.toml`
 - Backups: `/home/steam/valheim-backups/`
 
 ## What the Installer Does
 
-1. Installs SteamCMD and Valheim Dedicated Server (Steam App ID 896660)
-2. Installs Valheim Plus mod from the Grantapher fork
-3. Creates `steam` system user for running the server
-4. Sets up systemd service (`valheim.service`)
-5. Configures daily auto-update cron job (5 AM Eastern)
-6. Opens firewall ports 2456-2458/UDP if UFW is active
+1. Creates `steam` system user for running the server
+2. Installs Rust and Valheim Mod Manager (vmm) for the steam user
+3. Installs SteamCMD and Valheim Dedicated Server (Steam App ID 896660)
+4. Configures vmm with BepInEx and Valheim Plus, then installs mods
+5. Sets up systemd service (`valheim.service`)
+6. Configures daily auto-update cron job (5 AM Eastern) - updates both game and mods
+7. Opens firewall ports 2456-2458/UDP if UFW is active
 
 ## Running the Installer
 

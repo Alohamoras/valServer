@@ -11,6 +11,7 @@ from tools.server import register_server_tools
 from tools.config import register_config_tools
 from tools.backup import register_backup_tools
 from tools.update import register_update_tools
+from tools.mods import register_mods_tools
 
 # Configuration paths
 CONFIG = {
@@ -31,6 +32,7 @@ register_server_tools(mcp, CONFIG)
 register_config_tools(mcp, CONFIG)
 register_backup_tools(mcp, CONFIG)
 register_update_tools(mcp, CONFIG)
+register_mods_tools(mcp, CONFIG)
 
 
 if __name__ == "__main__":

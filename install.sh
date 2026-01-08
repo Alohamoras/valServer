@@ -49,7 +49,7 @@ STEAM_HOME="/home/${STEAM_USER}"
 STEAMCMD_DIR="${STEAM_HOME}/steamcmd"
 VALHEIM_DIR="${STEAM_HOME}/valheim-server"
 VALHEIM_DATA_DIR="${STEAM_HOME}/.config/unity3d/IronGate/Valheim"
-VALHEIM_PLUS_URL="https://github.com/Grantapher/ValheimPlus/releases/latest/download/UnixServer.tar.gz"
+VMM_CONFIG="${STEAM_HOME}/vmm_config.toml"
 
 # Colors for output
 RED='\033[0;31m'
@@ -134,7 +134,7 @@ fi
 log_info "Installing dependencies..."
 dpkg --add-architecture i386
 apt-get update
-apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq python3.12-venv
+apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq python3.12-venv git build-essential
 
 # --- Create steam user ---
 if ! id "$STEAM_USER" &>/dev/null; then
@@ -143,6 +143,23 @@ if ! id "$STEAM_USER" &>/dev/null; then
 else
     log_info "User ${STEAM_USER} already exists"
 fi
+
+# --- Install Rust and Valheim Mod Manager (vmm) ---
+log_info "Installing Rust for ${STEAM_USER} user..."
+if ! sudo -u "$STEAM_USER" bash -c 'command -v cargo &>/dev/null'; then
+    sudo -u "$STEAM_USER" bash -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
+else
+    log_info "Rust already installed for ${STEAM_USER}"
+fi
+
+log_info "Installing Valheim Mod Manager (vmm)..."
+VMM_REPO_DIR="${STEAM_HOME}/valheim-mod-manager"
+if [[ ! -d "$VMM_REPO_DIR" ]]; then
+    sudo -u "$STEAM_USER" git clone https://github.com/endoze/valheim-mod-manager.git "$VMM_REPO_DIR"
+fi
+cd "$VMM_REPO_DIR"
+sudo -u "$STEAM_USER" bash -c "source ${STEAM_HOME}/.cargo/env && cargo install --path ."
+log_info "vmm installed successfully"
 
 # --- Install SteamCMD ---
 log_info "Installing SteamCMD..."
@@ -165,28 +182,39 @@ sudo -u "$STEAM_USER" "${STEAMCMD_DIR}/steamcmd.sh" \
     +app_update 896660 validate \
     +quit
 
-# --- Install Valheim Plus ---
-log_info "Installing Valheim Plus..."
-cd "$VALHEIM_DIR"
+# --- Install Mods via vmm (BepInEx + Valheim Plus) ---
+log_info "Configuring Valheim Mod Manager..."
+cd "$STEAM_HOME"
 
-# Backup original files
+# Backup original files before mod installation
 sudo -u "$STEAM_USER" mkdir -p "${VALHEIM_DIR}/backup_original"
+cd "$VALHEIM_DIR"
 for file in valheim_server.x86_64 UnityPlayer.so; do
     if [[ -f "$file" ]] && [[ ! -f "${VALHEIM_DIR}/backup_original/$file" ]]; then
         sudo -u "$STEAM_USER" cp "$file" "${VALHEIM_DIR}/backup_original/"
     fi
 done
 
-# Download and extract Valheim Plus
-TEMP_DIR=$(mktemp -d)
-wget -q -O "${TEMP_DIR}/valheimplus.tar.gz" "$VALHEIM_PLUS_URL"
-tar -xzf "${TEMP_DIR}/valheimplus.tar.gz" -C "$VALHEIM_DIR"
-rm -rf "$TEMP_DIR"
+# Create vmm configuration
+log_info "Creating vmm_config.toml..."
+cat > "$VMM_CONFIG" << EOF
+mod_list = ["denikson-BepInExPack_Valheim", "Grantapher-ValheimPlus"]
+log_level = "info"
+cache_dir = "${STEAM_HOME}/.config/vmm"
+install_dir = "${VALHEIM_DIR}"
+EOF
+chown "${STEAM_USER}:${STEAM_USER}" "$VMM_CONFIG"
 
-# Download Valheim Plus config file (not included in tarball, and in-game download fails)
-VALHEIM_PLUS_VERSION=$(basename "$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/Grantapher/ValheimPlus/releases/latest)")
-VALHEIM_PLUS_CONFIG_URL="https://github.com/Grantapher/ValheimPlus/releases/download/${VALHEIM_PLUS_VERSION}/valheim_plus.cfg"
-wget -q -O "${VALHEIM_DIR}/BepInEx/config/valheim_plus.cfg" "$VALHEIM_PLUS_CONFIG_URL"
+# Create vmm cache directory
+sudo -u "$STEAM_USER" mkdir -p "${STEAM_HOME}/.config/vmm"
+
+# Install mods using vmm
+log_info "Downloading mod manifest from Thunderstore..."
+cd "$STEAM_HOME"
+sudo -u "$STEAM_USER" bash -c "source ${STEAM_HOME}/.cargo/env && vmm update manifest"
+
+log_info "Installing mods (BepInEx + Valheim Plus)..."
+sudo -u "$STEAM_USER" bash -c "source ${STEAM_HOME}/.cargo/env && vmm update mods"
 
 chown -R "${STEAM_USER}:${STEAM_USER}" "$VALHEIM_DIR"
 
@@ -266,12 +294,12 @@ cat > "${STEAM_HOME}/update-valheim.sh" << 'UPDATESCRIPT'
 #!/bin/bash
 #
 # Valheim Server Update Script
-# Updates both Valheim Dedicated Server and Valheim Plus
+# Updates Valheim Dedicated Server and all mods via vmm
 #
 
 STEAMCMD_DIR="STEAMCMD_DIR_PLACEHOLDER"
 VALHEIM_DIR="VALHEIM_DIR_PLACEHOLDER"
-VALHEIM_PLUS_URL="VALHEIM_PLUS_URL_PLACEHOLDER"
+STEAM_HOME="STEAM_HOME_PLACEHOLDER"
 LOG_FILE="/var/log/valheim-update.log"
 
 log() {
@@ -297,16 +325,22 @@ log "Updating Valheim Dedicated Server..."
     +app_update 896660 validate \
     +quit >> "$LOG_FILE" 2>&1
 
-# Update Valheim Plus
-log "Updating Valheim Plus..."
-TEMP_DIR=$(mktemp -d)
-if wget -q -O "${TEMP_DIR}/valheimplus.tar.gz" "$VALHEIM_PLUS_URL"; then
-    tar -xzf "${TEMP_DIR}/valheimplus.tar.gz" -C "$VALHEIM_DIR"
-    log "Valheim Plus updated successfully"
+# Update mods via vmm
+log "Updating mod manifest from Thunderstore..."
+cd "$STEAM_HOME"
+source "${STEAM_HOME}/.cargo/env"
+if vmm update manifest >> "$LOG_FILE" 2>&1; then
+    log "Mod manifest updated successfully"
 else
-    log "WARNING: Failed to download Valheim Plus update"
+    log "WARNING: Failed to update mod manifest"
 fi
-rm -rf "$TEMP_DIR"
+
+log "Updating mods..."
+if vmm update mods >> "$LOG_FILE" 2>&1; then
+    log "Mods updated successfully"
+else
+    log "WARNING: Failed to update mods"
+fi
 
 # Restart server if it was running
 if [ "$SERVER_WAS_RUNNING" = true ]; then
@@ -319,7 +353,7 @@ UPDATESCRIPT
 
 sed -i "s|STEAMCMD_DIR_PLACEHOLDER|${STEAMCMD_DIR}|g" "${STEAM_HOME}/update-valheim.sh"
 sed -i "s|VALHEIM_DIR_PLACEHOLDER|${VALHEIM_DIR}|g" "${STEAM_HOME}/update-valheim.sh"
-sed -i "s|VALHEIM_PLUS_URL_PLACEHOLDER|${VALHEIM_PLUS_URL}|g" "${STEAM_HOME}/update-valheim.sh"
+sed -i "s|STEAM_HOME_PLACEHOLDER|${STEAM_HOME}|g" "${STEAM_HOME}/update-valheim.sh"
 
 chmod +x "${STEAM_HOME}/update-valheim.sh"
 chown "${STEAM_USER}:${STEAM_USER}" "${STEAM_HOME}/update-valheim.sh"
@@ -400,6 +434,11 @@ echo "  Server Files:    ${VALHEIM_DIR}"
 echo "  World Saves:     ${VALHEIM_DATA_DIR}"
 echo "  Start Script:    ${VALHEIM_DIR}/start_server.sh"
 echo "  Update Script:   ${STEAM_HOME}/update-valheim.sh"
+echo ""
+echo "Mod Management (vmm):"
+echo "  Config:          ${VMM_CONFIG}"
+echo "  Add mod:         sudo -u steam bash -c 'source ~/.cargo/env && vmm search <name>'"
+echo "  Update mods:     sudo -u steam bash -c 'source ~/.cargo/env && vmm update manifest && vmm update mods'"
 echo ""
 echo "Valheim Plus Configuration:"
 echo -e "  ${YELLOW}${VALHEIM_DIR}/BepInEx/config/valheim_plus.cfg${NC}"
