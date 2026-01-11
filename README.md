@@ -9,9 +9,10 @@ Claude is generally smart enough to do this without help, but this server makes 
 ## Features
 
 - Installs SteamCMD and Valheim Dedicated Server
-- Installs [Valheim Plus](https://github.com/Grantapher/ValheimPlus) mod
+- Installs [Valheim Mod Manager (vmm)](https://github.com/endoze/valheim-mod-manager) for mod management
+- Installs [BepInEx](https://github.com/BepInEx/BepInEx) and [Valheim Plus](https://github.com/Grantapher/ValheimPlus) via vmm
 - Creates systemd service for easy server management
-- Configures daily auto-updates (5 AM Eastern Time)
+- Configures daily auto-updates for game and mods (5 AM Eastern Time)
 - Automatically configures UFW firewall rules if active
 - **MCP server for Claude AI integration** (manage server via natural language)
 
@@ -73,6 +74,7 @@ sudo /home/steam/update-valheim.sh
 | Server files | `/home/steam/valheim-server/` |
 | World saves | `/home/steam/.config/unity3d/IronGate/Valheim/` |
 | Valheim Plus config | `/home/steam/valheim-server/BepInEx/config/valheim_plus.cfg` |
+| Mod config (vmm) | `/home/steam/vmm_config.toml` |
 | Backups | `/home/steam/valheim-backups/` |
 | Update log | `/var/log/valheim-update.log` |
 
@@ -89,6 +91,36 @@ Restart the server after making changes:
 ```bash
 sudo systemctl restart valheim
 ```
+
+## Mod Management
+
+Mods are managed via [Valheim Mod Manager (vmm)](https://github.com/endoze/valheim-mod-manager), which downloads mods from [Thunderstore](https://thunderstore.io/c/valheim/) and handles dependencies automatically.
+
+### Adding Mods
+
+```bash
+# Search for mods
+sudo -u steam bash -c 'source ~/.cargo/env && vmm search "mod name"'
+
+# Add a mod (use Owner-ModName format from search results)
+sudo -u steam bash -c 'source ~/.cargo/env && vmm add ValheimModding-Jotunn'
+
+# Install all configured mods
+sudo -u steam bash -c 'source ~/.cargo/env && vmm update'
+```
+
+### Updating Mods
+
+The daily auto-update cron job updates both the game and all mods. To update mods manually:
+
+```bash
+sudo -u steam bash -c 'source ~/.cargo/env && vmm update'
+sudo systemctl restart valheim
+```
+
+### Mod Configuration
+
+Mods are configured in `/home/steam/vmm_config.toml`. The MCP server provides tools to manage mods without manual file editing.
 
 ## Claude AI Integration (MCP Server)
 
@@ -124,6 +156,7 @@ This project includes an MCP server that allows Claude to manage your Valheim se
 | Config | `config_get`, `config_set`, `config_sections` |
 | Backup | `backup_create`, `backup_list`, `backup_restore`, `backup_delete` |
 | Update | `update_check`, `update_server`, `update_valheimplus`, `update_all` |
+| Mods | `mods_list`, `mods_add`, `mods_remove`, `mods_search`, `mods_update` |
 
 ### Example Usage
 
@@ -134,3 +167,5 @@ Just ask Claude:
 - "Update Valheim Plus to the latest version"
 - "Show me the last 100 lines of server logs"
 - "Enable the Map section in Valheim Plus config"
+- "Search for equipment mods"
+- "Add the Jotunn mod"
