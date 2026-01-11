@@ -11,7 +11,7 @@ Self-host a Valheim server on Ubuntu and manage it entirely through conversation
 ## Quick Start
 
 1. Install Ubuntu 24.04
-2. Install [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+2. Install [Claude Code](https://code.claude.com/docs/en/quickstart)
 3. Ask Claude to clone this repo and run the install script
 4. Start managing your server through conversation
 
