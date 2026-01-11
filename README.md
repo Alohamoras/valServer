@@ -1,6 +1,10 @@
 # Valheim Dedicated Server Installer
 
-Automated installer for a Valheim dedicated server with Valheim Plus mod on Ubuntu 24.04. Includes an MCP server for Claude integration.
+Do you want to self host a Valheim server on an ubuntu server and manage it entirely by asking Claude to do things? I build this repo to do exactly that!
+Claude is generally smart enough to do this without help, but this server makes claude a whole lot smarter, it includes:
+  - An install script for the basic steam cmd stuff
+  - An MCP server for Claude AI integration (manage server via natural language)
+  - claude.md with more context for Claude, it makes Claude smarter!
 
 ## Features
 
