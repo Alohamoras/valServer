@@ -6,24 +6,14 @@ Self-host a Valheim server on Ubuntu and manage it entirely through conversation
 
 - **Install script** — Sets up SteamCMD, the Valheim dedicated server, and systemd services
 - **MCP server** — Enables Claude to manage your server directly (start/stop, mod installation, status checks, etc.)
-- **claude.md** — Project context that helps Claude understand the server architecture and available commands
+- **CLAUDE.md** — Project context that helps Claude understand the server architecture and available commands
 
 ## Quick Start
 
 1. Install Ubuntu 24.04
 2. Install [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 3. Ask Claude to clone this repo and run the install script
-4. Start managing your server through conversation — search for mods, check status, update the server, and more
-
-## Features
-
-- Installs SteamCMD and Valheim Dedicated Server
-- Installs [Valheim Mod Manager (vmm)](https://github.com/endoze/valheim-mod-manager) for mod management
-- Installs [BepInEx](https://github.com/BepInEx/BepInEx) and [Valheim Plus](https://github.com/Grantapher/ValheimPlus) via vmm
-- Creates systemd service for easy server management
-- Configures daily auto-updates for game and mods (5 AM Eastern Time)
-- Automatically configures UFW firewall rules if active
-- **MCP server for Claude AI integration** (manage server via natural language)
+4. Start managing your server through conversation
 
 ## Requirements
 
@@ -41,13 +31,11 @@ cd valServer
 sudo ./install.sh
 ```
 
-### One-Liner (Non-Interactive)
+### Non-Interactive
 
 ```bash
 sudo ./install.sh -n "My Server" -w "MyWorld" -p "secret123" -y -s
 ```
-
-### Options
 
 | Flag | Description |
 |------|-------------|
@@ -58,25 +46,38 @@ sudo ./install.sh -n "My Server" -w "MyWorld" -p "secret123" -y -s
 | `-s` | Start server after installation |
 | `-h` | Show help message |
 
-## Server Management
+## Using Your Server
 
-```bash
-sudo systemctl start valheim     # Start server
-sudo systemctl stop valheim      # Stop server
-sudo systemctl restart valheim   # Restart server
-sudo systemctl status valheim    # Check status
-sudo journalctl -u valheim -f    # View live logs
-```
+After installation, just ask Claude. The MCP server is automatically configured during install.
 
-## Updating
+**Example requests:**
+- "What's the server status?"
+- "Restart the server"
+- "Create a backup"
+- "Search for mods with 'equipment' in the name"
+- "Add the Jotunn mod"
+- "Update the server and all mods"
+- "Enable map sharing in Valheim Plus"
+- "Show me the last 100 lines of server logs"
 
-Updates run automatically daily at 5 AM Eastern Time. To update manually:
+Claude can handle server lifecycle, mod management, configuration, backups, and updates — all through conversation.
 
-```bash
-sudo /home/steam/update-valheim.sh
-```
+## Features
 
-## File Locations
+- Installs SteamCMD and Valheim Dedicated Server
+- Installs [Valheim Mod Manager (vmm)](https://github.com/endoze/valheim-mod-manager) for mod management
+- Installs [BepInEx](https://github.com/BepInEx/BepInEx) and [Valheim Plus](https://github.com/Grantapher/ValheimPlus) via vmm
+- Creates systemd service for easy server management
+- Configures daily auto-updates for game and mods (5 AM Eastern Time)
+- Automatically configures UFW firewall rules if active
+
+---
+
+## Reference
+
+The sections below document manual commands and file locations. These are provided for troubleshooting, advanced use cases, or if you prefer to manage the server without Claude.
+
+### File Locations
 
 | Description | Path |
 |-------------|------|
@@ -87,25 +88,27 @@ sudo /home/steam/update-valheim.sh
 | Backups | `/home/steam/valheim-backups/` |
 | Update log | `/var/log/valheim-update.log` |
 
-## Valheim Plus Configuration
-
-Edit the Valheim Plus config to customize gameplay:
+### Manual Server Management
 
 ```bash
-sudo nano /home/steam/valheim-server/BepInEx/config/valheim_plus.cfg
+sudo systemctl start valheim     # Start server
+sudo systemctl stop valheim      # Stop server
+sudo systemctl restart valheim   # Restart server
+sudo systemctl status valheim    # Check status
+sudo journalctl -u valheim -f    # View live logs
 ```
 
-Restart the server after making changes:
+### Manual Updates
+
+Updates run automatically daily at 5 AM Eastern Time. To update manually:
 
 ```bash
-sudo systemctl restart valheim
+sudo /home/steam/update-valheim.sh
 ```
 
-## Mod Management
+### Manual Mod Management
 
 Mods are managed via [Valheim Mod Manager (vmm)](https://github.com/endoze/valheim-mod-manager), which downloads mods from [Thunderstore](https://thunderstore.io/c/valheim/) and handles dependencies automatically.
-
-### Adding Mods
 
 ```bash
 # Search for mods
@@ -118,46 +121,23 @@ sudo -u steam bash -c 'source ~/.cargo/env && vmm add ValheimModding-Jotunn'
 sudo -u steam bash -c 'source ~/.cargo/env && vmm update'
 ```
 
-### Updating Mods
+### Valheim Plus Configuration
 
-The daily auto-update cron job updates both the game and all mods. To update mods manually:
+Edit the config file directly:
 
 ```bash
-sudo -u steam bash -c 'source ~/.cargo/env && vmm update'
+sudo nano /home/steam/valheim-server/BepInEx/config/valheim_plus.cfg
+```
+
+Restart the server after making changes:
+
+```bash
 sudo systemctl restart valheim
 ```
 
-### Mod Configuration
+### MCP Server Details
 
-Mods are configured in `/home/steam/vmm_config.toml`. The MCP server provides tools to manage mods without manual file editing.
-
-## Claude AI Integration (MCP Server)
-
-This project includes an MCP server that allows Claude to manage your Valheim server directly.
-
-### Setup
-
-1. Install Python dependencies:
-   ```bash
-   cd mcp-server
-   pip install -r requirements.txt
-   ```
-
-2. Add to your Claude Code settings (`~/.claude/settings.json`):
-   ```json
-   {
-     "mcpServers": {
-       "valheim": {
-         "command": "python",
-         "args": ["/path/to/valServer/mcp-server/valheim_server.py"]
-       }
-     }
-   }
-   ```
-
-3. Restart Claude Code
-
-### Available Tools
+The MCP server provides Claude with these tools:
 
 | Category | Tools |
 |----------|-------|
@@ -167,14 +147,20 @@ This project includes an MCP server that allows Claude to manage your Valheim se
 | Update | `update_check`, `update_server`, `update_valheimplus`, `update_all` |
 | Mods | `mods_list`, `mods_add`, `mods_remove`, `mods_search`, `mods_update` |
 
-### Example Usage
+**Manual MCP setup** (only needed if auto-setup failed):
 
-Just ask Claude:
-- "What's the server status?"
-- "Restart the Valheim server"
-- "Create a backup before we make changes"
-- "Update Valheim Plus to the latest version"
-- "Show me the last 100 lines of server logs"
-- "Enable the Map section in Valheim Plus config"
-- "Search for equipment mods"
-- "Add the Jotunn mod"
+1. Install dependencies:
+   ```bash
+   cd mcp-server
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   deactivate
+   ```
+
+2. Register with Claude Code:
+   ```bash
+   claude mcp add --transport stdio valheim -- /path/to/valServer/mcp-server/venv/bin/python /path/to/valServer/mcp-server/valheim_server.py
+   ```
+
+3. Restart Claude Code
