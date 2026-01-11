@@ -1,10 +1,19 @@
 # Valheim Dedicated Server Installer
 
-Do you want to self host a Valheim server on an ubuntu server and manage it entirely by asking Claude to do things? I build this repo to do exactly that!
-Claude is generally smart enough to do this without help, but this server makes claude a whole lot smarter, it includes:
-  - An install script for the basic steam cmd stuff
-  - An MCP server for Claude AI integration (manage server via natural language)
-  - claude.md with more context for Claude, it makes Claude smarter!
+Self-host a Valheim server on Ubuntu and manage it entirely through conversation with Claude. This repo provides everything you need: automated installation, mod management via Thunderstore, and an MCP server that lets Claude handle server administration through natural language.
+
+## What's Included
+
+- **Install script** — Sets up SteamCMD, the Valheim dedicated server, and systemd services
+- **MCP server** — Enables Claude to manage your server directly (start/stop, mod installation, status checks, etc.)
+- **claude.md** — Project context that helps Claude understand the server architecture and available commands
+
+## Quick Start
+
+1. Install Ubuntu 24.04
+2. Install [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+3. Ask Claude to clone this repo and run the install script
+4. Start managing your server through conversation — search for mods, check status, update the server, and more
 
 ## Features
 
