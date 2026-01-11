@@ -106,6 +106,22 @@ Updates run automatically daily at 5 AM Eastern Time. To update manually:
 sudo /home/steam/update-valheim.sh
 ```
 
+### Uninstalling
+
+Remove the server and all components:
+
+```bash
+sudo ./uninstall.sh
+```
+
+| Flag | Description |
+|------|-------------|
+| `-y` | Skip confirmation prompts |
+| `-k` | Keep world saves and backups |
+| `-h` | Show help |
+
+Example: `sudo ./uninstall.sh -y -k` removes everything except your world data.
+
 ### Manual Mod Management
 
 Mods are managed via [Valheim Mod Manager (vmm)](https://github.com/endoze/valheim-mod-manager), which downloads mods from [Thunderstore](https://thunderstore.io/c/valheim/) and handles dependencies automatically.
