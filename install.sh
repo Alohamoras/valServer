@@ -135,7 +135,7 @@ fi
 log_info "Installing dependencies..."
 dpkg --add-architecture i386
 apt-get update
-apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq python3.12-venv git build-essential
+apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq python3.12-venv git build-essential acl
 
 # --- Create steam user ---
 if ! id "$STEAM_USER" &>/dev/null; then
@@ -305,12 +305,17 @@ cat > "${STEAM_HOME}/update-valheim.sh" << 'UPDATESCRIPT'
 #!/bin/bash
 #
 # Valheim Server Update Script
-# Updates Valheim Dedicated Server and all mods via vmm
+# Updates Valheim Dedicated Server and all mods via vmm.
+#
+# Invoked by /etc/cron.d/valheim-update as root. SteamCMD and vmm must run
+# as the steam user — running them as root sends Steam state to /root/Steam
+# (causing "Missing configuration") and breaks vmm's PATH lookup (~/.cargo/env
+# resolves $HOME=/root, so /home/steam/.cargo/bin/vmm is never on PATH).
 #
 
 STEAMCMD_DIR="STEAMCMD_DIR_PLACEHOLDER"
 VALHEIM_DIR="VALHEIM_DIR_PLACEHOLDER"
-STEAM_HOME="STEAM_HOME_PLACEHOLDER"
+STEAM_USER="STEAM_USER_PLACEHOLDER"
 LOG_FILE="/var/log/valheim-update.log"
 
 log() {
@@ -328,26 +333,28 @@ if systemctl is-active --quiet valheim.service; then
     sleep 10
 fi
 
-# Update Valheim Dedicated Server
+# Update Valheim Dedicated Server (must run as steam user — see header)
 log "Updating Valheim Dedicated Server..."
-"${STEAMCMD_DIR}/steamcmd.sh" \
+if sudo -u "$STEAM_USER" -H "${STEAMCMD_DIR}/steamcmd.sh" \
     +force_install_dir "$VALHEIM_DIR" \
     +login anonymous \
     +app_update 896660 validate \
-    +quit >> "$LOG_FILE" 2>&1
+    +quit >> "$LOG_FILE" 2>&1; then
+    log "Valheim server updated successfully"
+else
+    log "WARNING: SteamCMD update failed (exit $?)"
+fi
 
-# Update mods via vmm
+# Update mods via vmm (must run as steam user — see header)
 log "Updating mod manifest from Thunderstore..."
-cd "$STEAM_HOME"
-source "${STEAM_HOME}/.cargo/env"
-if vmm update manifest >> "$LOG_FILE" 2>&1; then
+if sudo -u "$STEAM_USER" -H bash -lc 'source ~/.cargo/env && cd ~ && vmm update manifest' >> "$LOG_FILE" 2>&1; then
     log "Mod manifest updated successfully"
 else
     log "WARNING: Failed to update mod manifest"
 fi
 
 log "Updating mods..."
-if vmm update mods >> "$LOG_FILE" 2>&1; then
+if sudo -u "$STEAM_USER" -H bash -lc 'source ~/.cargo/env && cd ~ && vmm update mods' >> "$LOG_FILE" 2>&1; then
     log "Mods updated successfully"
 else
     log "WARNING: Failed to update mods"
@@ -364,7 +371,7 @@ UPDATESCRIPT
 
 sed -i "s|STEAMCMD_DIR_PLACEHOLDER|${STEAMCMD_DIR}|g" "${STEAM_HOME}/update-valheim.sh"
 sed -i "s|VALHEIM_DIR_PLACEHOLDER|${VALHEIM_DIR}|g" "${STEAM_HOME}/update-valheim.sh"
-sed -i "s|STEAM_HOME_PLACEHOLDER|${STEAM_HOME}|g" "${STEAM_HOME}/update-valheim.sh"
+sed -i "s|STEAM_USER_PLACEHOLDER|${STEAM_USER}|g" "${STEAM_HOME}/update-valheim.sh"
 
 chmod +x "${STEAM_HOME}/update-valheim.sh"
 chown "${STEAM_USER}:${STEAM_USER}" "${STEAM_HOME}/update-valheim.sh"
@@ -395,6 +402,40 @@ if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
     ufw allow 2456:2458/udp comment "Valheim Server"
 fi
 
+# --- Determine the user who will run Claude Code (and the MCP server) ---
+if [[ -n "$SUDO_USER" ]]; then
+    CLAUDE_USER="$SUDO_USER"
+else
+    CLAUDE_USER="$USER"
+fi
+
+# --- Grant MCP user access to /home/steam paths ---
+# The MCP server runs as $CLAUDE_USER (not root, not steam). By default
+# /home/steam is 0750, which blocks even read access. Open up traversal and
+# apply ACLs to the specific paths the MCP needs to read or write. Default
+# ACLs make new files (e.g. valheim_plus.cfg generated on first server run,
+# new backup archives) inherit the same permissions automatically.
+if [[ -n "$CLAUDE_USER" ]] && [[ "$CLAUDE_USER" != "root" ]] && [[ "$CLAUDE_USER" != "$STEAM_USER" ]]; then
+    log_info "Granting MCP user '${CLAUDE_USER}' access to ${STEAM_HOME} paths..."
+
+    # Traversal into /home/steam
+    chmod 755 "$STEAM_HOME"
+
+    # Ensure the backup dir exists so we can apply a default ACL to it
+    sudo -u "$STEAM_USER" mkdir -p "${STEAM_HOME}/valheim-backups"
+
+    # Read+write on the files/dirs the MCP modifies
+    setfacl    -m "u:${CLAUDE_USER}:rw"  "$VMM_CONFIG"
+    setfacl -R -m "u:${CLAUDE_USER}:rwX" "${VALHEIM_DIR}/BepInEx/config" 2>/dev/null || true
+    setfacl -d -m "u:${CLAUDE_USER}:rwX" "${VALHEIM_DIR}/BepInEx/config" 2>/dev/null || true
+    setfacl -R -m "u:${CLAUDE_USER}:rwX" "${STEAM_HOME}/valheim-backups"
+    setfacl -d -m "u:${CLAUDE_USER}:rwX" "${STEAM_HOME}/valheim-backups"
+
+    # Read on the world saves dir (needed by backup_create)
+    setfacl -R -m "u:${CLAUDE_USER}:rX" "${VALHEIM_DATA_DIR}" 2>/dev/null || true
+    setfacl -d -m "u:${CLAUDE_USER}:rX" "${VALHEIM_DATA_DIR}" 2>/dev/null || true
+fi
+
 # --- Setup MCP Server for Claude Code ---
 MCP_DIR="${SCRIPT_DIR}/mcp-server"
 
@@ -407,13 +448,6 @@ if [[ -d "$MCP_DIR" ]]; then
     source venv/bin/activate
     pip install -q -r requirements.txt
     deactivate
-
-    # Configure Claude Code MCP server for the user who ran sudo
-    if [[ -n "$SUDO_USER" ]]; then
-        CLAUDE_USER="$SUDO_USER"
-    else
-        CLAUDE_USER="$USER"
-    fi
 
     # Check if claude CLI is available and register MCP server
     if command -v claude &>/dev/null; then
