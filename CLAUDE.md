@@ -29,7 +29,7 @@ If you need to set up manually:
 
 1. Install dependencies:
    ```bash
-   sudo apt install python3.12-venv -y
+   sudo apt install python3-venv -y
    cd mcp-server
    python3 -m venv venv
    source venv/bin/activate

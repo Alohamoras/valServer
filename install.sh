@@ -135,7 +135,7 @@ fi
 log_info "Installing dependencies..."
 dpkg --add-architecture i386
 apt-get update
-apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq python3.12-venv git build-essential acl
+apt-get install -y lib32gcc-s1 lib32stdc++6 libsdl2-2.0-0 libsdl2-2.0-0:i386 curl wget tar jq python3-venv git build-essential acl
 
 # --- Create steam user ---
 if ! id "$STEAM_USER" &>/dev/null; then
